@@ -1,0 +1,15 @@
+﻿# Dependencies
+node_modules/
+
+# Build output
+dist/
+coverage/
+
+# Local tooling
+.vite/
+*.log
+.DS_Store
+Thumbs.db
+
+# Local screenshots and temporary verification artifacts
+artifacts/
