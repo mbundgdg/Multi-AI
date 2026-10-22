@@ -7,12 +7,14 @@ import {
   createGame,
   dropDistance,
   gravityInterval,
+  HIDDEN_ROWS,
   levelForLines,
   tryRotate,
   type ActivePiece,
   type Cell,
   type GameSnapshot,
 } from './engine';
+import { getRotatedMatrix } from './tetrominoes';
 
 const piece = (overrides: Partial<ActivePiece> = {}): ActivePiece => ({
   type: 'O',
@@ -187,6 +189,32 @@ describe('createGame', () => {
     expect(snapshot.level).toBe(1);
   });
 
+  it('spawns every tetromino with at least one active cell in the visible area', () => {
+    const seen = new Set<string>();
+    for (let seed = 0; seed < 64 && seen.size < 7; seed += 1) {
+      const snapshot = createGame(seed).snapshot();
+      const active = snapshot.active;
+      expect(active).not.toBeNull();
+      if (active === null) {
+        throw new Error('活动方块未生成');
+      }
+      seen.add(active.type);
+      const matrix = getRotatedMatrix(active.type, active.rotation);
+      const hasVisibleCell = matrix.some((row, rowIndex) =>
+        row.some(
+          (cell, columnIndex) =>
+            cell !== 0 &&
+            active.x + columnIndex >= 0 &&
+            active.x + columnIndex < 10 &&
+            active.y + rowIndex >= HIDDEN_ROWS &&
+            active.y + rowIndex < 24,
+        ),
+      );
+      expect(hasVisibleCell, `seed ${seed} spawned ${active.type}`).toBe(true);
+    }
+    expect(seen.size).toBe(7);
+  });
+
   it('does not fall before start', () => {
     const game = createGame(1);
     const before = game.snapshot().active?.y;
@@ -225,12 +253,12 @@ describe('createGame', () => {
     const game = createGame(1);
     game.start();
     game.tick(799);
-    expect(game.snapshot().active?.y).toBe(0);
+    expect(game.snapshot().active?.y).toBe(2);
     game.tick(1);
-    expect(game.snapshot().active?.y).toBe(1);
+    expect(game.snapshot().active?.y).toBe(3);
     game.tick(Number.NaN);
     game.tick(-100);
-    expect(game.snapshot().active?.y).toBe(1);
+    expect(game.snapshot().active?.y).toBe(3);
   });
 
   it('ignores every command while paused', () => {
@@ -289,7 +317,7 @@ describe('createGame', () => {
     const game = createGame(1);
     game.start();
     game.softDrop();
-    expect(game.snapshot().active?.y).toBe(1);
+    expect(game.snapshot().active?.y).toBe(3);
     expect(game.snapshot().score).toBe(1);
     game.softDrop();
     expect(game.snapshot().score).toBe(2);
@@ -328,7 +356,7 @@ describe('createGame', () => {
     const snapshot = game.snapshot();
     expect(snapshot.lines).toBe(1);
     expect(snapshot.level).toBe(1);
-    expect(snapshot.score).toBe(268);
+    expect(snapshot.score).toBe(252);
     expect(snapshot.board[23]!.some((cell) => cell === null)).toBe(true);
   });
 

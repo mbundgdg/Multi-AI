@@ -7,8 +7,8 @@ export type TetrominoMatrix = number[][];
 export const TETROMINOES: Record<TetrominoType, TetrominoMatrix> = {
   I: [
     [0, 0, 0, 0],
-    [1, 1, 1, 1],
     [0, 0, 0, 0],
+    [1, 1, 1, 1],
     [0, 0, 0, 0],
   ],
   O: [

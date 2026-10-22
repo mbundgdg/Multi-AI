@@ -182,7 +182,12 @@ export function createGame(seed: number = Date.now()): TetrisGame {
   }
 
   function spawn(type: TetrominoType): void {
-    const active: ActivePiece = { type, rotation: 0, x: 3, y: 0 };
+    const active: ActivePiece = {
+      type,
+      rotation: 0,
+      x: 3,
+      y: HIDDEN_ROWS - 2,
+    };
     if (collides(state.board, active)) {
       state.active = null;
       state.status = 'gameover';
