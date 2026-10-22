@@ -81,6 +81,31 @@ describe('clearLines', () => {
     expect(result.board[21]!.every((cell) => cell === null)).toBe(true);
   });
 
+  it('clears three adjacent rows and shifts the row above down', () => {
+    const board = createBoard();
+    board[23] = Array(10).fill('I');
+    board[22] = Array(10).fill('O');
+    board[21] = Array(10).fill('T');
+    board[20]![1] = 'L';
+    const result = clearLines(board);
+    expect(result.cleared).toBe(3);
+    expect(result.board[23]![1]).toBe('L');
+    expect(result.board[21]!.every((cell) => cell === null)).toBe(true);
+  });
+
+  it('clears four adjacent rows', () => {
+    const board = createBoard();
+    board[20] = Array(10).fill('I');
+    board[21] = Array(10).fill('O');
+    board[22] = Array(10).fill('T');
+    board[23] = Array(10).fill('S');
+    board[19]![2] = 'J';
+    const result = clearLines(board);
+    expect(result.cleared).toBe(4);
+    expect(result.board[23]![2]).toBe('J');
+    expect(result.board[20]!.every((cell) => cell === null)).toBe(true);
+  });
+
   it('does not mutate the input board', () => {
     const board = createBoard();
     board[23] = Array(10).fill('I');
