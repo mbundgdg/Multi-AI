@@ -1,0 +1,29 @@
+:root {
+  color-scheme: light;
+  --page-bg: #d8cfbb;
+  --shell: #e7decb;
+  --shell-edge: #b8aa90;
+  --lcd: #a9b689;
+  --lcd-light: #b5c395;
+  --ink: #263526;
+  --muted-ink: #526047;
+  --button: #d7ccb7;
+  --accent: #768b68;
+  --danger: #bf786d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--page-bg);
+  color: var(--ink);
+  font-family: "SFMono-Regular", "Cascadia Mono", "Consolas", "Liberation Mono", monospace;
+}

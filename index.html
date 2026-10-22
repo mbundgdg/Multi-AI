@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#d8cfbb" />
+    <title>口袋俄罗斯方块</title>
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="console" aria-label="口袋俄罗斯方块">
+        <header class="status-bar">
+          <div class="status-item">
+            <span class="status-label">分数</span>
+            <span class="status-value" id="score-value">0</span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">消行</span>
+            <span class="status-value" id="lines-value">0</span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">等级</span>
+            <span class="status-value" id="level-value">1</span>
+          </div>
+          <button class="pause-button" id="pause-button" type="button" aria-label="暂停或继续游戏">
+            暂停
+          </button>
+        </header>
+
+        <div class="lcd" id="lcd">
+          <div class="board-column">
+            <div class="board-frame">
+              <canvas
+                id="board-canvas"
+                width="300"
+                height="600"
+                tabindex="0"
+                role="img"
+                aria-label="俄罗斯方块棋盘"
+              ></canvas>
+              <div class="game-overlay" id="game-overlay" role="dialog" aria-modal="true">
+                <h1 class="overlay-title" id="overlay-title">口袋俄罗斯方块</h1>
+                <p class="overlay-message" id="overlay-message">方向键移动，上键旋转，空格硬降。</p>
+                <button class="overlay-action" id="overlay-action" type="button">开始游戏</button>
+              </div>
+            </div>
+          </div>
+
+          <aside class="info-panel" aria-label="游戏信息">
+            <div class="preview">
+              <span class="preview-label">暂存</span>
+              <canvas id="hold-canvas" width="80" height="80" aria-label="暂存方块"></canvas>
+            </div>
+            <div class="preview">
+              <span class="preview-label">下一个</span>
+              <canvas id="next-canvas" width="80" height="80" aria-label="下一个方块"></canvas>
+            </div>
+            <p class="keyboard-hints">
+              方向键移动<br />
+              ↑ / X / W 旋转<br />
+              Z 逆旋 · 空格硬降<br />
+              C / Shift 暂存<br />
+              P / Esc 暂停 · R 重开
+            </p>
+          </aside>
+        </div>
+
+        <div class="touch-controls" id="touch-controls" aria-label="触控操作">
+          <button class="touch-button" type="button" data-action="left" aria-label="左移">←</button>
+          <button class="touch-button" type="button" data-action="rotate-cw" aria-label="顺时针旋转">旋转</button>
+          <button class="touch-button" type="button" data-action="right" aria-label="右移">→</button>
+          <button class="touch-button" type="button" data-action="soft-drop" aria-label="软降">↓</button>
+          <button class="touch-button" type="button" data-action="hold" aria-label="暂存方块">暂存</button>
+          <button class="touch-button touch-button--accent" type="button" data-action="hard-drop" aria-label="硬降">
+            硬降
+          </button>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
