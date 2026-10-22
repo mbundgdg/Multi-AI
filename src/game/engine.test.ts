@@ -4,11 +4,14 @@ import {
   clearLines,
   collides,
   createBoard,
+  createGame,
   dropDistance,
   gravityInterval,
   levelForLines,
   tryRotate,
   type ActivePiece,
+  type Cell,
+  type GameSnapshot,
 } from './engine';
 
 const piece = (overrides: Partial<ActivePiece> = {}): ActivePiece => ({
@@ -143,5 +146,198 @@ describe('tryRotate', () => {
   it('wraps rotation counter-clockwise', () => {
     const rotated = tryRotate(createBoard(), piece({ type: 'T', x: 3, y: 0 }), -1);
     expect(rotated?.rotation).toBe(3);
+  });
+});
+
+describe('createGame', () => {
+  it('starts in ready state with a spawned piece and a deterministic next', () => {
+    const game = createGame(1);
+    const snapshot = game.snapshot();
+    expect(snapshot.status).toBe('ready');
+    expect(snapshot.active?.type).toBe('O');
+    expect(snapshot.next).toBe('J');
+    expect(snapshot.hold).toBeNull();
+    expect(snapshot.score).toBe(0);
+    expect(snapshot.lines).toBe(0);
+    expect(snapshot.level).toBe(1);
+  });
+
+  it('does not fall before start', () => {
+    const game = createGame(1);
+    const before = game.snapshot().active?.y;
+    game.tick(5000);
+    expect(game.snapshot().active?.y).toBe(before);
+  });
+
+  it('moves to playing on start', () => {
+    const game = createGame(1);
+    game.start();
+    expect(game.snapshot().status).toBe('playing');
+  });
+
+  it('moves horizontally only while playing', () => {
+    const game = createGame(1);
+    const startX = game.snapshot().active!.x;
+    game.move(-1);
+    expect(game.snapshot().active!.x).toBe(startX);
+    game.start();
+    game.move(-1);
+    expect(game.snapshot().active!.x).toBe(startX - 1);
+    game.move(1);
+    expect(game.snapshot().active!.x).toBe(startX);
+  });
+
+  it('rotates the active piece', () => {
+    const game = createGame(1);
+    game.start();
+    game.rotate(1);
+    expect(game.snapshot().active?.rotation).toBe(1);
+    game.rotate(-1);
+    expect(game.snapshot().active?.rotation).toBe(0);
+  });
+
+  it('advances gravity by accumulated ticks', () => {
+    const game = createGame(1);
+    game.start();
+    game.tick(799);
+    expect(game.snapshot().active?.y).toBe(0);
+    game.tick(1);
+    expect(game.snapshot().active?.y).toBe(1);
+    game.tick(Number.NaN);
+    game.tick(-100);
+    expect(game.snapshot().active?.y).toBe(1);
+  });
+
+  it('ignores every command while paused', () => {
+    const game = createGame(1);
+    game.start();
+    game.togglePause();
+    const paused = game.snapshot();
+    expect(paused.status).toBe('paused');
+    game.move(-1);
+    game.move(1);
+    game.rotate(1);
+    game.rotate(-1);
+    game.softDrop();
+    game.hardDrop();
+    game.hold();
+    game.tick(5000);
+    expect(game.snapshot()).toEqual(paused);
+    game.togglePause();
+    expect(game.snapshot().status).toBe('playing');
+  });
+
+  it('stores the first held piece and advances the queue', () => {
+    const game = createGame(1);
+    game.start();
+    game.hold();
+    const snapshot = game.snapshot();
+    expect(snapshot.hold).toBe('O');
+    expect(snapshot.active?.type).toBe('J');
+    expect(snapshot.next).toBe('L');
+    expect(snapshot.canHold).toBe(false);
+  });
+
+  it('ignores a second hold before locking', () => {
+    const game = createGame(1);
+    game.start();
+    game.hold();
+    const afterFirst = game.snapshot();
+    game.hold();
+    expect(game.snapshot()).toEqual(afterFirst);
+  });
+
+  it('allows hold again after locking', () => {
+    const game = createGame(1);
+    game.start();
+    game.hold();
+    game.hardDrop();
+    const snapshot = game.snapshot();
+    expect(snapshot.canHold).toBe(true);
+    expect(snapshot.hold).toBe('O');
+    game.hold();
+    expect(game.snapshot().active?.type).toBe('O');
+    expect(game.snapshot().hold).toBe('L');
+  });
+
+  it('adds one point per soft-drop row', () => {
+    const game = createGame(1);
+    game.start();
+    game.softDrop();
+    expect(game.snapshot().active?.y).toBe(1);
+    expect(game.snapshot().score).toBe(1);
+    game.softDrop();
+    expect(game.snapshot().score).toBe(2);
+  });
+
+  it('adds two points per hard-drop row and locks immediately', () => {
+    const game = createGame(1);
+    game.start();
+    const before = game.snapshot();
+    const distance = before.ghostY! - before.active!.y;
+    game.hardDrop();
+    const after = game.snapshot();
+    expect(after.score).toBe(distance * 2);
+    expect(after.active?.type).toBe('J');
+    expect(after.board[23]![4]).toBe('O');
+    expect(after.board[23]![5]).toBe('O');
+  });
+
+  it('clears a completed line and scores it by level', () => {
+    const game = createGame(1);
+    game.start();
+    for (let step = 0; step < 4; step += 1) {
+      game.move(-1);
+    }
+    game.hardDrop();
+    game.move(-1);
+    game.hardDrop();
+    for (let step = 0; step < 4; step += 1) {
+      game.move(1);
+    }
+    game.hardDrop();
+    for (let step = 0; step < 2; step += 1) {
+      game.move(1);
+    }
+    game.hardDrop();
+    const snapshot = game.snapshot();
+    expect(snapshot.lines).toBe(1);
+    expect(snapshot.level).toBe(1);
+    expect(snapshot.score).toBe(268);
+    expect(snapshot.board[23]!.some((cell) => cell === null)).toBe(true);
+  });
+
+  it('returns snapshot copies that cannot mutate internal state', () => {
+    const game = createGame(1);
+    game.start();
+    const snapshot = game.snapshot() as GameSnapshot;
+    (snapshot.board[23] as Cell[])[0] = 'I';
+    (snapshot.active as ActivePiece).x = 99;
+    const fresh = game.snapshot();
+    expect(fresh.board[23]![0]).toBeNull();
+    expect(fresh.active?.x).toBe(3);
+  });
+
+  it('reaches game over through repeated hard drops and restarts cleanly', () => {
+    const game = createGame(1);
+    game.start();
+    game.hardDrop();
+    game.hold();
+    let guard = 0;
+    while (game.snapshot().status === 'playing' && guard < 200) {
+      game.hardDrop();
+      guard += 1;
+    }
+    expect(game.snapshot().status).toBe('gameover');
+    expect(game.snapshot().active).toBeNull();
+    game.restart();
+    const snapshot = game.snapshot();
+    expect(snapshot.status).toBe('playing');
+    expect(snapshot.score).toBe(0);
+    expect(snapshot.lines).toBe(0);
+    expect(snapshot.level).toBe(1);
+    expect(snapshot.hold).toBeNull();
+    expect(snapshot.active).not.toBeNull();
+    expect(snapshot.board.flat().every((cell) => cell === null)).toBe(true);
   });
 });
