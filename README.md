@@ -1,4 +1,4 @@
-﻿# 口袋俄罗斯方块
+# 口袋俄罗斯方块
 
 移动优先的复古掌机风格俄罗斯方块，使用原生 TypeScript、Vite 与 Canvas 2D 实现，用于验证 Orchestrator–Implementer 协同开发架构。
 
@@ -15,6 +15,15 @@ npm run dev
 ```
 
 默认开发地址由 Vite 输出（通常为 `http://localhost:5173/`）。
+
+## Paseo 托管开发服务器
+
+`paseo.json` 将 Vite 声明为 Paseo `service` script。推荐在 Paseo workspace 中使用 workspace script 的 start/stop 生命周期，而不是由 agent 通过后台 shell 启动开发服务器：
+
+- script 名称：`dev`
+- 本地端口：`5173`
+- Paseo 会自动提供本地代理 URL、健康状态和受管 terminal
+- 停止后端口会释放，避免后台进程句柄阻塞 agent 工具调用
 
 ## 测试
 
@@ -60,6 +69,7 @@ npm run preview
 .
 ├── index.html                      页面外壳与可访问 DOM
 ├── package.json                    脚本与开发依赖
+├── paseo.json                      Paseo workspace service 配置
 ├── tsconfig.json                   严格 TypeScript 配置
 ├── src/
 │   ├── game/                       纯游戏规则与测试
