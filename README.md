@@ -16,14 +16,9 @@ npm run dev
 
 默认开发地址由 Vite 输出（通常为 `http://localhost:5173/`）。
 
-## Paseo 托管开发服务器
+## 可选：Paseo workspace script
 
-`paseo.json` 将 Vite 声明为 Paseo `service` script。推荐在 Paseo workspace 中使用 workspace script 的 start/stop 生命周期，而不是由 agent 通过后台 shell 启动开发服务器：
-
-- script 名称：`dev`
-- 本地端口：`5173`
-- Paseo 会自动提供本地代理 URL、健康状态和受管 terminal
-- 停止后端口会释放，避免后台进程句柄阻塞 agent 工具调用
+`paseo.json` 保留为可选的开发服务器托管实验，不是架构默认路径。默认 Implementer 管理方式为终端 CLI；开发服务器由 Orchestrator 在独立终端会话启动和停止。
 
 ## 测试
 
