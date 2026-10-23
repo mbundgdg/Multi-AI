@@ -308,7 +308,18 @@ def classify_line(line: str) -> Classification:
         message = _extract_message(parsed)
         session_id = _extract_session_id(parsed)
         kind = _structured_kind(types)
-        if kind is None:
+        top_type = parsed.get("type")
+        is_error = parsed.get("is_error") is True or str(parsed.get("subtype", "")).lower() in {
+            "error",
+            "failed",
+        }
+        if kind is None and is_error:
+            kind = "error"
+        elif kind is None and top_type in {"user", "assistant", "system", "result"}:
+            # stream-json 的 message/tool_result 只是数据载体；其中引用的提示词、
+            # TDD 文案或文档内容不能触发 Orchestrator 的“等待输入”事件。
+            kind = "progress"
+        elif kind is None:
             if _matches(_APPROVAL_PATTERNS, message):
                 kind = "approval_required"
             elif _matches(_WAITING_INPUT_PATTERNS, message):
@@ -396,13 +407,37 @@ class EventSink:
         }
 
     def _write_status(self) -> None:
+        payload = json.dumps(self._status(), ensure_ascii=False, indent=2) + "\n"
         temporary = self.config.status_file.with_name(self.config.status_file.name + ".tmp")
-        temporary.write_text(
-            json.dumps(self._status(), ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
-        os.replace(temporary, self.config.status_file)
-
+        temporary.write_text(payload, encoding="utf-8")
+        # Windows Defender、编辑器或状态读取方可能短暂持有目标文件句柄，
+        # 使单次 os.replace 返回 WinError 5。重试让瞬时占用自行释放。
+        for attempt, delay in enumerate((0.0, 0.01, 0.02, 0.05, 0.10, 0.20)):
+            if delay:
+                time.sleep(delay)
+            try:
+                os.replace(temporary, self.config.status_file)
+                return
+            except PermissionError:
+                if attempt == 5:
+                    break
+        # 原子替换持续被占用时降级为直接覆盖，优先保证 Supervisor 不崩溃；
+        # 极端情况下再写独立 fallback 文件，事件日志和原始日志仍是权威证据。
+        try:
+            self.config.status_file.write_text(payload, encoding="utf-8")
+        except OSError:
+            fallback = self.config.status_file.with_name(
+                self.config.status_file.stem + ".fallback.json"
+            )
+            try:
+                fallback.write_text(payload, encoding="utf-8")
+            except OSError:
+                pass
+        finally:
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                pass
     pid: int | None = None
 
     def write_raw(self, line: str) -> None:
@@ -510,6 +545,7 @@ def _terminal_event(
     exit_code: int,
     *,
     paused: bool,
+    process_exit_code: int | None = None,
 ) -> None:
     session_hint = {"resumable": bool(sink.config.session_id), "session_id": sink.config.session_id}
     if paused:
@@ -536,10 +572,13 @@ def _terminal_event(
             exit_code=exit_code,
         )
     else:
+        failure_data = {"exit_code": exit_code, "resumable": bool(sink.config.session_id)}
+        if process_exit_code is not None:
+            failure_data["process_exit_code"] = process_exit_code
         sink.emit(
             "failed",
             "Implementer 异常退出",
-            data={"exit_code": exit_code, "resumable": bool(sink.config.session_id)},
+            data=failure_data,
             state="failed",
             exit_code=exit_code,
         )
@@ -636,6 +675,7 @@ def run_supervisor(
     timeout_emitted = False
     pause_requested = False
     cancel_seen = False
+    actionable_error_seen = False
     stop_deadline: float | None = None
     stream_done = False
 
@@ -684,6 +724,8 @@ def run_supervisor(
                 sink.emit(classified.kind, classified.message, data=classified.data, state="running", actionable=False)
             else:
                 sink.emit(classified.kind, classified.message, data=classified.data, state="running")
+                if classified.kind == "error":
+                    actionable_error_seen = True
 
         while True:
             try:
@@ -747,7 +789,8 @@ def run_supervisor(
                 )
                 timeout_emitted = True
 
-    exit_code = process.wait()
+    process_exit_code = process.wait()
+    exit_code = process_exit_code
     if process.stdout is not None:
         process.stdout.close()
     if process.stdin is not None:
@@ -756,11 +799,20 @@ def run_supervisor(
         terminal_kind = "paused"
     elif exit_code in CANCEL_EXIT_CODES or cancel_seen:
         terminal_kind = "canceled"
+    elif actionable_error_seen and process_exit_code == 0:
+        # provider 已明确输出 error 时，CLI 以 0 退出也不得覆盖成 completed。
+        exit_code = 1
+        terminal_kind = "failed"
     elif exit_code == 0:
         terminal_kind = "completed"
     else:
         terminal_kind = "failed"
-    _terminal_event(sink, exit_code, paused=terminal_kind == "paused")
+    _terminal_event(
+        sink,
+        exit_code,
+        paused=terminal_kind == "paused",
+        process_exit_code=process_exit_code if process_exit_code != exit_code else None,
+    )
     return exit_code
 
 

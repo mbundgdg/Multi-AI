@@ -78,6 +78,39 @@ class EventClassifierTests(unittest.TestCase):
         self.assertEqual(event.session_id, "ses_demo")
         self.assertIn("批准", event.message)
 
+    def test_tool_result_text_is_not_waiting_input(self) -> None:
+        line = json.dumps(
+            {
+                "type": "user",
+                "message": {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "content": [{"type": "text", "text": "waiting for user input: select a parameter"}],
+                        }
+                    ],
+                },
+            },
+            ensure_ascii=False,
+        )
+        event = sup.classify_line(line)
+        self.assertEqual(event.kind, "progress")
+
+    def test_structured_is_error_is_actionable(self) -> None:
+        event = sup.classify_line(
+            json.dumps(
+                {
+                    "type": "result",
+                    "subtype": "error",
+                    "is_error": True,
+                    "result": "工具执行失败",
+                },
+                ensure_ascii=False,
+            )
+        )
+        self.assertEqual(event.kind, "error")
+        self.assertTrue(event.actionable)
     def test_structured_input_wait(self) -> None:
         event = sup.classify_line(
             json.dumps({"event": "question", "message": "请选择目标目录"})
@@ -131,6 +164,59 @@ class ControlCommandTests(unittest.TestCase):
         command = sup.parse_control_command('{"action":"pause"}')
         self.assertEqual(command.action, "pause")
 
+
+class EventSinkStatusTests(unittest.TestCase):
+    def make_config(self, root: Path) -> sup.SupervisorConfig:
+        return sup.SupervisorConfig(
+            provider="generic",
+            cwd=root,
+            session_id="ses_test",
+            event_log=root / "events.jsonl",
+            status_file=root / "status.json",
+            raw_log=root / "raw.log",
+            heartbeat_seconds=1.0,
+            heartbeat_timeout_seconds=10.0,
+            emit_progress=False,
+            emit_heartbeat=False,
+            control_stdin=False,
+            command=[sys.executable, "-c", "pass"],
+        )
+
+    def test_status_replace_retries_transient_permission_error(self) -> None:
+        real_replace = sup.os.replace
+        calls = 0
+
+        def flaky_replace(src: str, dst: str) -> None:
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise PermissionError(13, "temporarily busy", dst)
+            real_replace(src, dst)
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            config = self.make_config(root)
+            sink = sup.EventSink(config)
+            with mock.patch.object(sup.os, "replace", side_effect=flaky_replace):
+                sink.emit("progress", "测试状态重试", state="running")
+            self.assertEqual(calls, 2)
+            status = json.loads(config.status_file.read_text(encoding="utf-8"))
+            self.assertEqual(status["state"], "running")
+
+    def test_status_write_falls_back_without_crashing(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            config = self.make_config(root)
+            sink = sup.EventSink(config)
+            with mock.patch.object(
+                sup.os,
+                "replace",
+                side_effect=PermissionError(13, "persistently busy"),
+            ):
+                sink.emit("progress", "测试直写降级", state="running")
+            status = json.loads(config.status_file.read_text(encoding="utf-8"))
+            self.assertEqual(status["state"], "running")
+            self.assertEqual(status["last_message"], "测试直写降级")
 
 class ProcessIntegrationTests(unittest.TestCase):
     def make_config(self, child_code: str, root: Path) -> sup.SupervisorConfig:
@@ -201,6 +287,23 @@ class ProcessIntegrationTests(unittest.TestCase):
             self.assertEqual(status["state"], "failed")
             self.assertEqual(status["exit_code"], 7)
 
+    def test_structured_error_then_zero_exit_is_failure(self) -> None:
+        code = (
+            "print('{\"type\":\"error\",\"error\":\"No conversation found\"}', flush=True)\n"
+            "raise SystemExit(0)\n"
+        )
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            config = self.make_config(code, root)
+            exit_code = sup.run_supervisor(config)
+            self.assertEqual(exit_code, 1)
+            events = self.read_events(config.event_log)
+            self.assertEqual(events[-2]["kind"], "error")
+            self.assertEqual(events[-1]["kind"], "failed")
+            self.assertEqual(events[-1]["data"]["process_exit_code"], 0)
+            status = json.loads(config.status_file.read_text(encoding="utf-8"))
+            self.assertEqual(status["state"], "failed")
+            self.assertEqual(status["exit_code"], 1)
     def test_signal_like_exit_emits_canceled(self) -> None:
         code = "import sys\nprint('canceled by user', flush=True)\nsys.exit(130)\n"
         with tempfile.TemporaryDirectory() as td:
