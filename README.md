@@ -1,92 +1,41 @@
-# 口袋俄罗斯方块
+# Multi-AI
 
-移动优先的复古掌机风格俄罗斯方块，使用原生 TypeScript、Vite 与 Canvas 2D 实现，用于验证 Orchestrator–Implementer 协同开发架构。
+> 可审计、可复现、可验证的多角色 AI 协同开发框架。
 
-## 安装
+Multi-AI 面向本地代码项目，将 AI 开发任务组织为 Orchestrator（编排者）与多个按领域分工的 Implementer（实施者）。
 
-```bash
-npm install
+Orchestrator 负责需求澄清、角色拆分、接口冻结、计划制定、Diff 审查和独立验证；Implementer 通过 OpenCode、CodeBuddy 或通用 CLI 执行具体任务。项目内置统一 CLI Supervisor，将子进程输出归一化为 JSONL 事件与原子状态文件，支持审批、补充输入、checkpoint、暂停和异常分类，使多 Agent 协作过程可追踪、可恢复、可审计。
+
+## 核心能力
+
+- **统一编排**：由 Orchestrator 负责计划、分工、审查和最终验收。
+- **领域实施**：Implementer 按 MCU、后端、前端、算法等领域独立执行任务。
+- **CLI 托管**：支持 OpenCode、CodeBuddy 和通用 CLI 子进程。
+- **过程留痕**：统一输出原始日志、JSONL 事件和原子状态文件。
+- **交互控制**：支持审批、补充输入、checkpoint、暂停和停止。
+- **异常处理**：识别审批等待、输入等待、超时、失败、取消和完成状态。
+- **工程闭环**：强调独立验证、跨角色集成测试和最终文档归档。
+
+## 项目结构
+
+| 路径 | 说明 |
+| --- | --- |
+| `02.Multi-AI/` | 统一 CLI Supervisor 源码、测试和用法说明。 |
+| `Docs/00.todo.md` | 当前任务计划、验证结果和 Review 记录。 |
+| `Docs/01.history.md` | 项目经验、问题根因和可复用教训。 |
+| `Docs/02.Multi-AI_cli.md` | 当前 CLI 协作架构基线。 |
+| `Docs/02.Multi-AI_paseo.md` | Paseo 管理方式的历史架构记录。 |
+| `Docs/README.md` | Docs 目录索引。 |
+| `02.Multi_cli.md` | `Docs/02.Multi-AI_cli.md` 的根目录兼容副本。 |
+| `02.Multi_paseo.md` | `Docs/02.Multi-AI_paseo.md` 的根目录兼容副本。 |
+
+## 快速验证
+
+```powershell
+python -B 02.Multi-AI\test_cli_supervisor.py
+python -B -m py_compile 02.Multi-AI\cli_supervisor.py 02.Multi-AI\test_cli_supervisor.py
 ```
 
-## 运行
+## 使用边界
 
-```bash
-npm run dev
-```
-
-默认开发地址由 Vite 输出（通常为 `http://localhost:5173/`）。
-
-## 可选：Paseo workspace script
-
-`paseo.json` 保留为可选的开发服务器托管实验，不是架构默认路径。默认 Implementer 管理方式为终端 CLI；开发服务器由 Orchestrator 在独立终端会话启动和停止。
-
-## 测试
-
-```bash
-npm test -- --run
-```
-
-## 构建
-
-```bash
-npm run build
-npm run preview
-```
-
-构建产物位于 `dist/`。
-
-## 操作
-
-| 动作 | 键盘 | 触控 |
-| --- | --- | --- |
-| 左移 | `ArrowLeft` / `A` | 左移按钮 |
-| 右移 | `ArrowRight` / `D` | 右移按钮 |
-| 软降 | `ArrowDown` / `S` | 软降按钮（可按住） |
-| 顺时针旋转 | `ArrowUp` / `X` / `W` | 旋转按钮 |
-| 逆时针旋转 | `Z` | 长按旋转按钮 |
-| 硬降 | `Space` | 硬降按钮 |
-| 暂存 | `C` / `Shift` | 暂存按钮 |
-| 暂停 / 继续 | `P` / `Escape` | 状态栏暂停按钮 |
-| 重新开始 | `R` | 结束覆盖层按钮 |
-
-## 功能
-
-- 10×20 可见棋盘（内部 24 行，顶部 4 行隐藏出生区）。
-- 7-bag 随机与固定种子复现。
-- Next、Hold、幽灵块。
-- 软降、硬降、动态重力、等级与计分。
-- 暂停、游戏结束、重新开始。
-- 手机竖屏与桌面响应式布局，键盘和触控操作。
-
-## 目录结构
-
-```text
-.
-├── index.html                      页面外壳与可访问 DOM
-├── package.json                    脚本与开发依赖
-├── paseo.json                      Paseo workspace service 配置
-├── tsconfig.json                   严格 TypeScript 配置
-├── src/
-│   ├── game/                       纯游戏规则与测试
-│   │   ├── tetrominoes.ts          方块、随机数与 7-bag
-│   │   ├── tetrominoes.test.ts
-│   │   ├── engine.ts               棋盘、计分与状态机
-│   │   ├── engine.test.ts
-│   │   └── README.md
-│   ├── render/                     Canvas 渲染
-│   │   ├── canvas.ts
-│   │   └── README.md
-│   ├── input/                      键盘与触控映射
-│   │   ├── controls.ts
-│   │   ├── controls.test.ts
-│   │   └── README.md
-│   ├── main.ts                     组合根与动画循环
-│   ├── styles.css                  复古掌机视觉
-│   └── README.md
-├── Docs/                           计划、评审与架构文档
-└── README.md
-```
-
-## 架构
-
-`src/game/` 不依赖 DOM；`src/render/canvas.ts` 只读取不可变快照；`src/input/controls.ts` 只发出命令；`src/main.ts` 组合三者并管理覆盖层与 `requestAnimationFrame`。
+CLI Supervisor 只负责进程托管、事件归一化和状态留痕，不承担代码实现、Diff 审查、测试验收或项目文档归档。详细协议、provider 命令和 Orchestrator 等待闭环见 [`Docs/02.Multi-AI_cli.md`](Docs/02.Multi-AI_cli.md)，Supervisor 用法见 [`02.Multi-AI/README.md`](02.Multi-AI/README.md)。

@@ -1,18 +1,27 @@
-﻿# Dependencies
-node_modules/
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
 
-# Build output
+# Local runtime logs
+*.log
+.codex-runs/
+
+# Node legacy artifacts
+node_modules/
 dist/
 coverage/
-
-# Local tooling
 .vite/
-*.log
+
+# Editors and OS
+.vscode/
+.idea/
 .DS_Store
 Thumbs.db
 
 # Local screenshots and temporary verification artifacts
 artifacts/
-
-# Visual brainstorming session data
 .superpowers/

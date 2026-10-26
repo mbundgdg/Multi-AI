@@ -7,7 +7,7 @@
 | 文件 | 作用 |
 | --- | --- |
 | `cli_supervisor.py` | 托管 OpenCode、CodeBuddy 或 generic CLI 子进程；输出 `ecu.cli-event.v1` JSONL 事件，原子维护 `ecu.cli-status.v1` 状态文件，并支持审批、输入、checkpoint、暂停和异常分类。 |
-| `test_cli_supervisor.py` | 25 项标准库单元/进程集成测试；覆盖 provider 适配、真实入口解析、UTF-8、审批、输入、checkpoint、心跳超时、失败、取消和暂停。 |
+| `test_cli_supervisor.py` | 30 项标准库单元/进程集成测试；覆盖 provider 适配、真实入口解析、UTF-8、审批、输入、checkpoint、心跳超时、失败、取消和暂停。 |
 
 ## 快速验证
 
